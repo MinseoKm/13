@@ -1,220 +1,81 @@
-# 13
-13
-import UIKit
-import AVFoundation // 오디오 재생을 위한 헤더 파일
+# AVAudioPlayer 
 
-class ViewController: UIViewController, AVAudioPlayerDelegate, AVAudioRecorderDelegate {
-    
-    var audioPlayer : AVAudioPlayer! // AVAudioPlayer 인스턴스 변수
-    var audioFile : URL! // 재생할 오디오의 파일명 변수
-    
-    let MAX_VOLUME : Float = 10.0 // 최대 볼륨, 실수형 상수
-    
-    var progressTimer : Timer! // 타이머를 위한 변수
-    
-    let timePlayerSelector: Selector = #selector(ViewController.updatePlayTime) // 재생 타이머를 위한 상수 추가
-    let timeRecordSelector: Selector = #selector(ViewController.updateRecordTime) // 녹음 타이머를 위한 상수 추가
-    
-    //미션 이미지(하단)
-    @IBOutlet var imgView: UIImageView!
-    
-    //재생
-    @IBOutlet var pvProgressPlay: UIProgressView!
-    @IBOutlet var lblCurrentTime: UILabel!
-    @IBOutlet var lblEndTime: UILabel!
-    @IBOutlet var btnPlay: UIButton!
-    @IBOutlet var btnPause: UIButton!
-    @IBOutlet var btnStop: UIButton!
-    @IBOutlet var slVolume: UISlider!
-    
-    //녹음
-    @IBOutlet var btnRecord: UIButton!
-    @IBOutlet var lblRecordTime: UILabel!
-    
-    var audioRecorder : AVAudioRecorder! //audioRecorder 인스턴스 추가
-    var isRecordMode = false //현재가 '녹음 모드' 라는 것을 나타낼 isRecordMode (초기값은 false -> 재생 모드)
-    
-    //이미지 파일 - 미션
-    var imgPlay = UIImage(named: "play.png")
-    var imgStop = UIImage(named: "stop.png")
-    var imgRecord = UIImage(named: "record.png")
-    var imgPause = UIImage(named: "pause.png")
-    
-    override func viewDidLoad() {
-        super.viewDidLoad()
-       
-        selectAudioFile()
-        //녹음 모드가 아니라면, 즉 재생 모드라면 -> initPlay
-        if !isRecordMode { // MARK: 재생 모드 일때
-            initPlay()
-            //재생 모드이기때문에 녹음 버튼, 재생 시간 비활성
-            btnRecord.isEnabled = false
-            lblRecordTime.isEnabled = false
-        } else { // MARK: 녹음 모드 일때
-            //녹음 모드 초기화
-            initRecord()
-        }
-        imgView.image = imgStop
-    }
-    
-    //녹음 파일 생성
-    //재생 파일에 안 겹치게 모드에 따라 파일 선택하기 위해 함수 생성
-    // MARK: 재생 모드와 녹음 모드에 따라 다른 파일을 선택함
-    func selectAudioFile() {
-        
-        //재생모드 일때 사용
-        if !isRecordMode {
-            
-            //재생 모드일 때 재생될 file
-            audioFile = Bundle.main.url(forResource: "Sicilian_Breeze", withExtension: "mp3")
-            
-        } else {
-            
-            //녹음 모드일때 새파일 생성(recordFile.m4a)
-            let documentDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            audioFile = documentDirectory.appendingPathComponent("recordFile.m4a")
-        }
-    }
-    
-    //녹음을 위한 초기화
-    //(녹음btn click)재생 모드에 관한 모든 것들이 초기화
-    //포맷 : Apple Lossless
-    //음질 : "최대"
-    //비트율 : 320000bps(320kbps)
-    //오디오 채널 : 2
-    //샘플률 : 44100Hz
-    // MARK: 녹음 모드의 초기화
-    func initRecord() {
-        let recordSettings = [
-            AVFormatIDKey : NSNumber(value: kAudioFormatAppleLossless as UInt32),
-            AVEncoderAudioQualityKey : AVAudioQuality.max.rawValue,
-            AVEncoderBitRateKey : 320000,
-            AVNumberOfChannelsKey : 2,
-            AVSampleRateKey : 44100.0] as [String : Any]
-        
-        //selectAudioFile 함수에서 정한 audioFile을 URL로 하는 audioRecord인스턴스 생성
-        do {
-            audioRecorder = try AVAudioRecorder(url: audioFile, settings: recordSettings)
-        } catch let error as NSError {
-            print("Error-initRecord : \(error)")
-        }
-        
-        //AVAudioRecordDelegate delegate 상속받아준다(ViewController)
-        //delegate를 self로 설정
-        audioRecorder.delegate = self
-        
-        slVolume.value = 1.0 //볼륨값 조절
-        audioPlayer.volume = slVolume.value //볼륨값 조절
-        lblEndTime.text = convertNSTimeInterval12String(0) //총 재생시간 0
-        lblCurrentTime.text = convertNSTimeInterval12String(0) //현재 재생시간 0
-        setPlayButtons(false, pause: false, stop: false) //Play,Pause,Stop 버튼 비 활성화
-        
-        //AVAudioSession의 session 생성 후 , 액티브 설정
-        let session = AVAudioSession.sharedInstance()
-        do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
-            try AVAudioSession.sharedInstance().setActive(true)
-        } catch let error as NSError {
-            print(" Error-setCategory : \(error)")
-            
-        }
-        do {
-            try session.setActive(true)
-        } catch let error as NSError {
-            print(" Error-setActive : \(error)")
-        }
-    }
-    
-    // 오디오 재생을 위한 초기화, 재생 모드/녹음 모드 구분 할때 편하기 위해
-    // MARK: 재생 모드의 초기화
-    func initPlay() {
-        // audioPlayer 인스턴스 생성, 파라미터인 오디오 파일 없을때 대비 하여 do-try-catch 문 사용
-        do {
-            audioPlayer = try AVAudioPlayer(contentsOf: audioFile)
-        } catch let error as NSError {
-            print("Error-initPlay : \(error)")
-        }
-        slVolume.maximumValue = MAX_VOLUME // 최대볼륨 10.0 초기화
-        slVolume.value = 1.0 // 볼륨 1.0 초기화
-        pvProgressPlay.progress = 0 // 프로그레스 뷰 0 초기화
+**이 앱은 기본적으로 '재생 모드'와 '녹음 모드'를 스위치로 전환할 수 있는 앱입니다. 재생, 일시 정지, 정지를 할 수 있으며 음악이 재생되는 동안 재생 정도가 프로그레스 뷰(Progress View)와 시간으로 표시됩니다. 또한 볼륨 조절도 가능합니다. 녹음 모드에서는 녹음을 할 수 있고 녹음이 되는 시간도 표시할 수 있습니다. 녹음이 종료되면 녹음 파일을, 일시 정지, 정지할 수 있습니다. 그리고 이 두 가지 모드를 스위치로 전환하여 반복적으로 사용할 수도 있습니다.**
+
+***
+```
+        slVolume.maximumValue = MAX_VOLUME 
+        slVolume.value = 1.0 
+        pvProgressPlay.progress = 0 
         
         audioPlayer.delegate = self
         audioPlayer.prepareToPlay()
         audioPlayer.volume = slVolume.value
-        lblEndTime.text = convertNSTimeInterval12String(audioPlayer.duration) // endTime(총 재생 시간) 초기화
-        lblCurrentTime.text = convertNSTimeInterval12String(0) // 00:00
-        
-        //버튼 제어 코드 간략화
-        setPlayButtons(true, pause: false, stop: false)
-        
-        //        재생, 일시정지, 정지 버튼 제어
-     
-    }
-    
-    // 버튼의 동작여부
-    // MARK: [재생], [일시 정지], [정지] 버튼을 활성화 또는 비활성화 하는 함수
-    func setPlayButtons(_ play: Bool, pause:Bool, stop: Bool) {
-        btnPlay.isEnabled = play
-        btnPause.isEnabled = pause
-        btnStop.isEnabled = stop
-    }
-    
-    //00:00으로 시간 변환해주는 함수
-    // MARK: 00:00 형태의 문자열로 변환함
-    func convertNSTimeInterval12String(_ time:TimeInterval) -> String {
-        let min = Int(time/60) // 60으로 나눈 몫을 정수로 변환하여 return
-        let sec = Int(time.truncatingRemainder(dividingBy: 60)) // 60으로 나눈 나머지값을 정수값으로 return
-        let strTime = String(format: "%02d:%02d", min, sec) // 위의 두 값을 활용해 "%02d:%02d" 형태의 문자열(String)으로 변환하여 return
+```
+슬라이더(slVolume)의 최대 볼륨을 상수 MAX_VOLUME인 10.0으로 초기화합니다.
+슬라이더(slVolume)의 볼륨을 1.0으로 초기화합니다.
+프로그레스 뷰(Progress View)의 진행을 0으로 초기화합니다.
+audioPlayer의 델리게이트를 self로 합니다.
+prepareToPlay()를 실행합니다.
+audioPlayer의 볼륨을 방금 앞에서 초기화한 슬라이더(slVolume)의 볼륨 값 1,0으로 초기화합니다.
+
+```
+        let min = Int(time/60)
+        let sec = Int(time.truncatingRemainder(dividingBy: 60)) 
+        let strTime = String(format: "%02d:%02d", min, sec) 
         return strTime
-    }
+```
+재생 시간의 매개변수인 time 값을 60으로 나눈 '몫'을 정수 값으로 변환하여 상수 min 값에 초기화합니다.
+time 값을 60으로 나눈 '나머지' 값을 정수 값으로 변환하여 상수 sec값에 초기화합니다.
+이 두 값을 활용해 "%02d:%02d" 형태의 문자열(String)로 변환하여 상수 strTime에 초기화합니다.
+이 값을 호출한 람수로 돌려보냅니다.
+
+```
+        lblEndTime.text = convertNSTimeInterval2String(audioPlayer.duration)
+        lblCurrentTime.text = convertNSTimeInterval2String(0)
+```
+오디오 파일의 재생 시간인 audioPlayer.duration값을 convertNSTimeInterval2String함수를 이용해 lblEndTime의 텍스트에 출력합니다.
+lblCurrentTime의 텍스트에는 convertNSTimeInterval2String함수를 이용해 00:00가 출력되도록 0의 값을 입력합니다.
+
+```
+        audioPlayer.play() 
+        setPlayButtons(false, pause: true, stop: true) 
+```
+audioPlayer.play함수를 실행해 오다오를 재생합니다.
+[Play] 버튼은 비활성화, 나머지 두 버튼은 활성화합니다.
     
-    // MARK: [재생] 버튼을 클릭하였을 때
-    @IBAction func btnPlayAudio(_ sender: UIButton) {
-        audioPlayer.play() // 오디오를 재생
-        setPlayButtons(false, pause: true, stop: true) // Play버튼은 비활성화, 나머지 두버튼은 활성화 한다
-        // 0.1초 간격으로 타이머 생성
-        progressTimer = Timer.scheduledTimer(timeInterval: 0.1, target: self, selector: timePlayerSelector, userInfo: nil, repeats: true)
-        imgView.image = imgPlay
-    }
-    
-    // MARK: 0.1초마다 호출되며 재생 시간을 표시함
+```
     @objc func updatePlayTime() {
-        lblCurrentTime.text = convertNSTimeInterval12String(audioPlayer.currentTime) // 재생시간을 레이블 lblCurrentTime에 표시
-        pvProgressPlay.progress = Float(audioPlayer.currentTime/audioPlayer.duration) // 프로그레스 뷰인 pvProgressPlay의 진행상황에 currentTime을 duration으로 나눈 값 표시
+        lblCurrentTime.text = convertNSTimeInterval12String(audioPlayer.currentTime) 
+        pvProgressPlay.progress = Float(audioPlayer.currentTime/audioPlayer.duration) 
     }
-    
-    // MARK: [일시 정지] 버튼을 클릭하였을 때
-    @IBAction func btnPauseAudio(_ sender: UIButton) {
-        audioPlayer.pause()
-        setPlayButtons(true, pause: false, stop: true)
-        imgView.image = imgPause
-    }
-    
-    // MARK: [정지] 버튼을 클릭하였을 때
-    @IBAction func btnStopAudio(_ sender: UIButton) {
-        audioPlayer.stop()
-        audioPlayer.currentTime = 0 //오디오를 정지하고 다시 재생하면 처음부터 재생해야 하므로 0
-        lblCurrentTime.text = convertNSTimeInterval12String(0) //재생시간도 00:00로 초기화 하기 위해
-        setPlayButtons(true, pause: false, stop: false)
-        progressTimer.invalidate() //타이머 무효화
-        imgView.image = imgStop
-    }
-    
-    //볼륨 조절
-    // MARK:  볼륨 슬라이더 값을 audioplayer.volume에 대입함
-    @IBAction func slChangeVolume(_ sender: UISlider) {
-        audioPlayer.volume = slVolume.value
-    }
-    
-    //오디오 재생 끝났을 경우 맨 처음 상태로 돌아가는 함수
-    // MARK: 재생이 종료되었을 때 호출 됨
+```
+재생 시간인 audioPlayer.currentTime을 레이블 'lblCurrentTime' 에 나타냅니다.
+프로그레스 뷰인 pvProgress Play의 진행 상황에 audioPlayer.currentTime을 audioPlayer.duration으로 나눈 값으로 표시합니다.
+
+```
+        audioPlayer.currentTime = 0 
+        lblCurrentTime.text = convertNSTimeInterval12String(0) 
+        progressTimer.invalidate() 
+```
+오디오를 정지하고 다시 재생하면 처음부터 재생해야 허므로 audioPlayer.currentTime을 0으로 합니다.
+재생 시간도 00:00로 초기화하기 위해 convertNSTimeInterval12String을 활용합니다.
+타이머도 무효화합니다.
+
+```
     func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        progressTimer.invalidate() //타이머 뮤효화
-        setPlayButtons(true, pause: false, stop: false) //Play버튼 제외, 나머지 버튼 비활성화
-        imgView.image = imgStop
+        progressTimer.invalidate()
+        setPlayButtons(true, pause: false, stop: false)
     }
-    
-    // MARK: 스위치를 On/Off하여 녹음 모드인지 재생 모드인지를 결정함
+```        
+타이머를 무효화합니다.
+[play] 버튼은 활성화하고 나머지 버튼은 비활성화합니다.
+
+> 녹음 구현
+
+```
+
+// MARK: 스위치를 On/Off하여 녹음 모드인지 재생 모드인지를 결정함
     @IBAction func swRecordMode(_ sender: UISwitch) {
             /*스위치가 On이 되었을 때는 -> 녹음모드
             [재생 중지 / 현재 재생 시간 00:00 / isRecordMode = true
