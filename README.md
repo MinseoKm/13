@@ -74,6 +74,9 @@ audioPlayer.play함수를 실행해 오다오를 재생합니다.
 > 녹음 구현
 
 ```
+var audiRecorder : AVAudioRecorder!
+var isRecordMode = false
+```
 
 // MARK: 스위치를 On/Off하여 녹음 모드인지 재생 모드인지를 결정함
     @IBAction func swRecordMode(_ sender: UISwitch) {
