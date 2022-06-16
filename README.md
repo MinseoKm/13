@@ -71,27 +71,65 @@ audioPlayer.play함수를 실행해 오다오를 재생합니다.
 타이머를 무효화합니다.
 [play] 버튼은 활성화하고 나머지 버튼은 비활성화합니다.
 
-> 녹음 구현
+> 녹음을 위한 초기화 하기
 
 ```
 var audiRecorder : AVAudioRecorder!
 var isRecordMode = false
 ```
+audioRecorder 인스턴스를 추가합니다.
+현재 '녹음 모드'라는 것을 나타낼 isRecordMode를 추가합니다. 기본값은 false로 하여 처음 앱을 실행했을 때 '녹음 모드'가 아닌 '재생 모드'가 나타나게 합니다.
 
-// MARK: 스위치를 On/Off하여 녹음 모드인지 재생 모드인지를 결정함
-    @IBAction func swRecordMode(_ sender: UISwitch) {
-            /*스위치가 On이 되었을 때는 -> 녹음모드
-            [재생 중지 / 현재 재생 시간 00:00 / isRecordMode = true
-            Record 버튼과 녹음 시간 활성화]*/
-        if sender.isOn { // MARK: 녹음 모드 일때
+```
+ func selectAudioFile(){
+        if !isRecordMode{
+             audioFile = Bundle.main.url(forResource: "Sicilian_Breeze", withExtension: "mp3")
+        }else {
+            let documentDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            audioFile = documentDirectory.appendingPathComponent("recordFile.m4a")
+        }
+    }
+```
+재생 모드일 때는 오디오 파일인 "Sicilian_Breeze.mp3"가 선택됩니다.
+녹음 모드일 때는 새 파일인 "recordFile.m4a"가 생성됩니다.
+
+```
+ if !isRecordMode {
+            initPlay()
+            btnRecord.isEnabled = false
+            lblRecordTime.isEnabled = false
+        }else {
+            initRecord()
+        }
+```
+if문의 조건이 '!isRecordMode'입니다. 이는 '녹음 모드가 아니라면'이므로 재생 모드를 말합니다. 따라서 initPlay 함수를 호출합니다.
+조건에 해당하는 것이 재생 모드이므로 [Record]버튼과 재생 시간은 비활성화로 설정합니다.
+조건에 해당하지 않는 경우, 이는 '녹음 모드라면'이므로 initRecord함수를 호출합니다.
+
+```
+        audioRecorder.delegate = self
+        slVolume.value = 1.0
+        audioPlayer.volume = slVolume.value
+        lblEndTime.text = convertNSTimeInterval2String(0)
+        lblCurrentTime.text = convertNSTimeInterval2String(0)
+        setPlayButtons(false, pause: false, stop: false)
+```
+AudioRecorder의 델리게이트(Delegate)를 self로 설정합니다.
+볼륨 슬라이더 값을 1.0으로 설정합니다.
+audioPlayer의 볼륨도 슬라이더 값과 동일한 1.0으로 설정합니다.
+총 재생 시간을 0으로 바꿉니다.
+현재 재생 시간을 0으로 바꿉니다.
+[Plat], [Pause] 및 [Stop] 버튼을 비활성화로 설정합니다.
+
+```
+        if sender.isOn {
             audioPlayer.stop()
             audioPlayer.currentTime = 0
             lblRecordTime!.text = convertNSTimeInterval12String(0)
             isRecordMode = true
             btnRecord.isEnabled = true
             lblRecordTime.isEnabled = true
-            
-        } else { // MARK: 재생 모드 일때
+        } else { 
             
             /*스위치가 Off이 되었을 때는 -> 재생 모드
             [isRecordMode = false / Record 버튼과 녹음 시간 비활성화 / 녹음시간 0으로 초기화]*/
@@ -99,47 +137,35 @@ var isRecordMode = false
             btnRecord.isEnabled = false
             lblRecordTime.isEnabled = false
             lblRecordTime.text = convertNSTimeInterval12String(0)
-        }
-        
-        //selectAudioFile 함수 호출하여 오디오 파일 선택 / 모드에따라 초기화할 함수 호출
-        //MARK: 모드에 따라 오디오 파일을 선택 함
+        }        
         selectAudioFile()
-        //MARK: 모드에 따라 재생 초기화 또는 녹음 초기화를 수행
-        if !isRecordMode { //MARK: 녹음 모드가 아닐때, 즉 재생 모드일 때
+        if !isRecordMode {
             initPlay()
-        } else { //MARK: 녹음 모드 일때
+        } else { 
             initRecord()
         }
-    }
-    
-    @IBAction func btnRecord(_ sender: UIButton) {
-        // 만약 버튼 이름이 Record 면 녹음을 하고 버튼 이름을 Stop 으로 변경
+```
+스위치가 [On]이 되었을 때는 '녹음 모드'이므로 오디오를 재생을 중지하고, 현재 재생 시간을 00:00으로 만들고, isRecordMode의 값을 참(true)으로 설정하고, [Record] 버튼과 녹음 시간을 활성화로 설정합니다.
+스위치가 [On]이 아닐 때, 즉 '재생 모드'일 때는 isRecordMode의 값을 거잣(false)으로 설정하고, [Record] 버튼과 녹음 시간을 비활성화하며, 녹음 시간은 0으로 초기화합니다.
+selectAudioFile 함수를 호출하여 오디오 파일을 선택하고, 모드에 따라 초기화할 함수를 호출합니다.
+
+```
         if (sender as AnyObject).titleLabel?.text == "Record" {
-            //MARK: 버튼이 "Record" 일 때 녹음을 중지함
             audioRecorder.record()
             (sender as AnyObject).setTitle("Stop", for: UIControl.State())
-            // 녹음할 때 타이머가 작동하도록 progressTimer에 Time.scheduledTimer 함수를 사용하는데 0.1초 간격으로 타이머 생성
-            progressTimer = Timer.scheduledTimer(timeInterval: 0.1, target: self, selector: timeRecordSelector , userInfo: nil, repeats: true)
-            imgView.image = imgRecord
-        } else { //MARK: 버튼이 "Stop"일 때 녹음을 위한 초기화를 수행함
-            // 그렇지 않으면 현재 녹음 중이므로 녹음을 중단하고
-            // 버튼이름을 Stop 으로 변경.
-            // [Play] 버튼을 활성화 하고 방금 녹음한 파일로 재생을 초기화
+        } else {
             audioRecorder.stop()
-            // 녹음이 중지되며 타이머 무효화
-            progressTimer.invalidate()
             (sender as AnyObject).setTitle("Record", for: UIControl.State())
             btnPlay.isEnabled = true
             initPlay()
-            imgView.image = imgStop
         }
-    }
-    
-    // 타이머에 의해 0.1초 간격으로 이함수를 실행한다. -> 녹음 시간 표시
-    //MARK: 0.1초마다 호출되며 녹음 시간을 표시함
-    @objc func updateRecordTime() {
-        lblRecordTime.text = convertNSTimeInterval12String(audioRecorder.currentTime)
-    }
-    
-}
+```
+만약에 버튼 이름이 'Record'이면 녹음을 하고 버튼 이름을 'Stop'으로 변경합니다.
+그렇지 않으면 현재 녹음 중이므로 녹음을 중단하고 버튼 이름을 'Stop'으로 변경합니다. 그리고 [Play] 버튼을 활성화하고 방금 녹음한 파일로 재생을 초기화합니다.
 
+```
+        progressTimer = Timer.scheduledTimer(timeInterval: 0.1, target: self, selector: timeRecordSelector, userInfo: nil, repeats: true)
+        progressTimer.invalidate()
+```
+녹할 때 타이머가 작동하도록 progressTimer에 Timer.scheduledTimer함수를 사용하는데, 0.1초 간격으로 타이머를 생성합니다.
+녹음이 중지되면 타이머를 무효화합니다.
