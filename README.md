@@ -29,7 +29,7 @@ audioPlayer의 볼륨을 방금 앞에서 초기화한 슬라이더(slVolume)의
 재생 시간의 매개변수인 time 값을 60으로 나눈 '몫'을 정수 값으로 변환하여 상수 min 값에 초기화합니다.         
 time 값을 60으로 나눈 '나머지' 값을 정수 값으로 변환하여 상수 sec값에 초기화합니다.           
 이 두 값을 활용해 "%02d:%02d" 형태의 문자열(String)로 변환하여 상수 strTime에 초기화합니다.                
-이 값을 호출한 람수로 돌려보냅니다.            
+이 값을 호출한 함수로 돌려보냅니다.            
 
 ```
         lblEndTime.text = convertNSTimeInterval2String(audioPlayer.duration)
